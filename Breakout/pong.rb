@@ -38,8 +38,11 @@ class Ball
 		@vy = -1 * @vy
 	end
 	
-	def start
-		@vx = 5
+	def start 
+		seed = [-1, 1]
+		#creates number between 4 and 8 or -4 ad -8
+		@vx = 5 * seed[rand*2]
+		#makes sure the ball speed is constant (combined valocity of 10)
 		@vy = -5
 	end
 	def stop
@@ -147,32 +150,21 @@ class GameWindow < Gosu::Window
 		@ball = Ball.new(self)
 		@paddle = Paddle.new(self)
 		@lives = []
-		colors = []
+		@colors = []
 		@bricks = []
 		@gameover = Gosu::Image.new(self, "gameover.png", false)
+		@level_text = Gosu::Font.new(self, 'courier', 25)
+		@rules_text = Gosu::Font.new(self, 'courier', 25)
 		@game_win = Gosu::Image.new(self, "win.png", false)
+
 		@num_lives = 3
 		@win = false
-		#creates the lives to be displayed
-		(0..1).each do |d|
-			@lives.push Life.new(self, d*25+5, 5)
-		end
-		#creates list of colors to randomly draw from
-		10.times do
-			colors.push "red"
-		end
-		3.times do
-			colors.push "green"
-		end
-		1.times do
-			colors.push "blue"
-		end
-		#creates the two rows of bricks
-		(2..6).each do |rows|
-			(0..8).each do |col|
-				@bricks.push Brick.new(self, col * 80+40, rows * 30, colors[rand*14])
-			end
-		end
+		@first_time = true
+		@level = 4
+		#used to display text for short duration
+		@repeat = true
+		start
+
 		
 	end
 	#collision detection
@@ -193,7 +185,79 @@ class GameWindow < Gosu::Window
 		end
 	end
 	
+	def start
+		#creates the lives to be displayed
+		(0..1).each do |d|
+			@lives.push Life.new(self, d*25+5, 5)
+		end
+		#creates list of colors to randomly draw from
+		#level 1 all red
+		#level 2 5 green
+		#level 3 15 green
+		#level 4 3 blue and 15 green
+		#for level 4
+		@bricks.clear
+		@colors.clear
+		num_green = 0
+		num_blue = 0
+		#initializing colors depending on level
+		if @level == 2
+			20.times do @colors.push "red" end
+			5.times do @colors.push "green" end
+		end
+		if @level >= 3
+			5.times do @colors.push "red" end
+			5.times do @colors.push "green" end
+		end
+		if @level == 4
+			2.times do @colors.push "blue" end
+		end
+		length = @colors.length
+		
+		#creates the two rows of bricks
+		(2..6).each do |rows|
+			(0..8).each do |col|
+			
+				if @level == 4 
+					color = @colors[rand*length]
+					if color == "blue" 
+						num_blue+=1
+						if num_blue > 3
+							color = "green"
+						end
+					end
+					if color == "green" 
+						num_green+=1
+						if num_green > 15
+							color = "red"
+						end
+					end
+				elsif @level == 3
+					color = @colors[rand*length]
+					if color == "green" 
+						num_green+=1
+						if num_green > 15
+							color = "red"
+						end
+					end
+				elsif @level == 2
+					color = @colors[rand*length]
+					if color == "green" 
+						num_green+=1
+						if num_green > 5
+							color = "red"
+						end	
+					end
+				else
+					color = "red"
+				end
+				@bricks.push Brick.new(self, col * 80+40, rows * 30, color)
+			end
+		end
 	
+	end
+	
+	#handles movement, collision and win conditions
 	def update
 		if button_down?(Gosu::KbLeft)
 			@paddle.move_left
@@ -205,15 +269,16 @@ class GameWindow < Gosu::Window
 		if are_touching?(@ball, @paddle)
 			@ball.reverse_y
 		end
-		if button_down?(Gosu::KbSpace)
+		if button_down?(Gosu::KbSpace) #and @first_time
+			@first_time = false
 			@ball.start
 		end
 		if button_down?(Gosu::KbEscape)
 			self.close
 		end
+		@win = true
 		#collsion detection... bugs everyonce in a while... not sure why...
 		@bricks.each do |brick|
-			@win = true
 			#if one of these color of bricks is left then we still haven't won
 			if brick.color == "red" or brick.color == "green"
 				@win = false
@@ -246,10 +311,35 @@ class GameWindow < Gosu::Window
 		@bricks.each do |brick|
 			brick.draw
 		end
+		if @first_time
+			@level_text.draw("Level 1", 250, 200, 2)
+			@rules_text.draw("Red Bricks: 1 hit", 250, 230, 2)
+		end
 		if @num_lives == 0 
 			@gameover.draw(200, 200, 2)
 		elsif @win
-			@game_win.draw(200, 200, 2)
+			#if you beaten the final level
+			if @level == 4
+				@game_win.draw(200, 200, 2)
+			else
+				if @repeat
+					@level_text.draw("Level #{@level + 1}", 250, 200, 2)
+					#for levels 2 or 3 (@level has not been incremented yet)
+					if @level == 1 or @level == 2
+						@rules_text.draw("Red Bricks: 1 hit, Green Bricks: 2 hits", 200, 230, 2)
+					#for level 4 (@level has not been incremented yet)
+					elsif @level == 3
+						@rules_text.draw("Red Bricks: 1 hit, Green Bricks: 2 hits, Blue Bricks: Invulnerable", 200, 230, 2)
+					end
+					@repeat = false
+				else
+					@level += 1
+					sleep(1)
+					start
+					@win = false
+					@repeat = true
+				end
+			end
 		else
 			@ball.draw
 		end
