@@ -5,6 +5,12 @@ require 'gosu'
 #screen dimensions
 $Height = 800
 $Width = 640
+#time per each level in seconds
+$TimeLimit = 10
+#number of asteroids you can't let past
+$AsteroidDeath = 10
+#length of laser powerup
+$LaserPowerup = 5
 
 #
 #	Lives Class
@@ -59,15 +65,16 @@ end
 #
 class Asteroid
 	attr_reader :x, :y, :w, :h, :name
-	def initialize(window)
+	def initialize(window, level)
 		@x = rand*($Width - 40)
 		@y = 0
 		@vy = 1
 		@w = 40
 		@h = 40
-		@images = ['asteroid.png', 'asteroid.png', 'asteroid.png', 'asteroid.png', 'smiles.png', 'smiles.png', 'pink.png', 'red.png']
-		@name = @images[rand*8]
+		@images = ['asteroid.png', 'smiles.png', 'pink.png', 'red.png', 'purple.png']
+		@name = @images[rand*(@images.length - (5 - level))]
 		@image = Gosu::Image.new(window, @name, false)
+		@purple_teleport = Time.now + rand*1 + 0.5
 		
 		@pause = false
 	end
@@ -80,12 +87,12 @@ class Asteroid
 		@pause = p
 	end
 	
-	def draw #(level)
+	def draw 
 		@image.draw(@x, @y, 1)
 		if !@pause
-			if @name == "smiles.png"# and level >= 2
+			if @name == "smiles.png"
 				@y = @y + 4
-			elsif @name == "pink.png"# and level >= 3
+			elsif @name == "pink.png"
 				@y = @y + 4
 				if @x > $Width - 40
 					@x = @x - 4
@@ -97,6 +104,12 @@ class Asteroid
 			elsif @name == "red.png"
 				@y = @y + @vy
 				@vy += 0.1
+			elsif @name == "purple.png"
+				@y = @y + 4
+				if @purple_teleport < Time.now
+					@x = rand*560 + 40
+					@purple_teleport = Time.now + rand*1 + 0.5
+				end
 			else
 				@y = @y + 2
 			end
@@ -245,7 +258,7 @@ class Ship
 			@powerup_name = "both"
 		end
 		if name == "laser_powerup.png"
-			@laser_timeout = Time.now + 5
+			@laser_timeout = Time.now + $LaserPowerup
 		end
 	end
 
@@ -314,14 +327,14 @@ class Display
 	
 	#startup message
 	def start_up
-		@line1.draw("Welcome to ____________", 120, 300, 3)
-		@line2.draw("Your goal is live for 2 minutes", 120, 330, 3)
-		@line3.draw("don't let 10 asteroids get passed!", 120, 360, 3)
+		@line1.draw("Welcome to THISGAME", 120, 300, 3)
+		@line2.draw("IF you complete all 5 levels you win!", 120, 330, 3)
+		@line3.draw("don't let #{$AsteroidDeath} asteroids get passed!", 120, 360, 3)
 		@line4.draw("Good Luck! (press space to start)", 120, 390, 3)
 	end
 	
-	def lives_left(lives)
-		@line1.draw("#{lives} live(s) left.", 200, 400, 3)
+	def level(new_level)
+		@line1.draw("Level #{new_level}.", 250, 400, 3)
 	end
 	
 	#scores displayed during runtime
@@ -338,7 +351,7 @@ end
 class MyWindow < Gosu::Window
 	def initialize
 		super($Width, $Height, false)
-		
+		self.caption = ("THISGAME")
 		#objects on screan
 		@ship = Ship.new(self)
 		@lasers = []
@@ -348,11 +361,12 @@ class MyWindow < Gosu::Window
 		@lives = []
 		@lives.push Lives.new(self, 550, 775)
 		@lives.push Lives.new(self, 600, 775)
+		@level = 1
 		
 		#timeing info
 		@asteroid_delay = Time.now + 1
 		@powerup_delay = Time.now + rand*1 + 1
-		@game_time = Time.now + 120 # + however many seconds you want the game to last
+		@game_time = Time.now + $TimeLimit # + however many seconds you want the game to last
 		@display_timer = Time.now
 		
 		#scoring info
@@ -389,6 +403,7 @@ class MyWindow < Gosu::Window
 				@pause = !@pause
 				pause_game(@pause)
 				@startup = false
+				@game_time = Time.now + $TimeLimit # + however many seconds you want the game to last
 			#once the game is started its used to fire
 			elsif !@game_done and !@pause
 				x = @ship.x
@@ -425,6 +440,57 @@ class MyWindow < Gosu::Window
 		end
 	end
 	
+	#used to pause or unpause the game
+	def pause_game(paused)
+		@ship.pause(paused)
+		@lasers.each do |laser|
+			laser.pause(paused)
+		end
+		@asteroids.each do |a|
+			a.pause(paused)
+		end
+		@explosions.each do |e|
+			e.pause(paused)
+		end
+		@powerups.each do |p|
+			p.pause(paused)
+		end
+	end
+
+	# restarts the game and resets everything	
+	def restart_game
+		clear_screen
+		pause_game(@pause)
+		@asteroids_missed = 0
+		@asteroids_hit = 0
+		@shots_fired = 0
+		@pause = false
+		@game_done = false
+		@win = false
+		@game_time = Time.now + $TimeLimit
+	end
+	def next_level
+		#don't reset the ship when you clear
+		clear_screen(false)
+		pause_game(@pause)
+		@pause = false
+		@game_done = false
+		@win = false
+		@game_time = Time.now + $TimeLimit
+	end
+	
+	def clear_screen(totally_clear = true)
+		@asteroids.clear
+		@explosions.clear
+		@lasers.clear
+		if totally_clear
+			@ship.restart
+		end
+		@powerups.clear
+		@asteroid_delay = Time.now + 1
+		@powerups_delay = Time.now + 1
+	end
+	
 	#update handles ships movement, creation of asteroids and powerups,
 	#collision detection and handling, and end game conditions
 	def update
@@ -437,7 +503,7 @@ class MyWindow < Gosu::Window
 		
 		#asteroid creation
 		if @asteroid_delay < Time.now and !@game_done and !@pause
-			@asteroids.push Asteroid.new(self)
+			@asteroids.push Asteroid.new(self, @level)
 			#delay till next asteroid
 			@asteroid_delay = Time.now + rand*2 + 0.1
 		end
@@ -469,9 +535,8 @@ class MyWindow < Gosu::Window
 				#loss of life
 				elsif check == 1
 					@explosions.push Explosion.new(self, @ship.x+5, @ship.y)
+					#creates a delay so you can see that you lost a life
 					@sleep_clear = 1
-	##########################################doesn't work####################################################
-					@display_timer = Time.now + 2
 				end
 				#if check == 0 then ship simply lost shield powerup
 			end
@@ -485,53 +550,22 @@ class MyWindow < Gosu::Window
 		end
 		#game timer
 		if @game_time < Time.now
+			if @level == 5
+				@game_done = true
+				@win = true
+			else
+				@level += 1
+				#restarts the timer for the next level
+				@game_time = Time.now + $TimeLimit
+				next_level
+				@display_timer = Time.now + 1
+			end
+				
+		end
+		#end game if you've missed too many asteroids
+		if @asteroids_missed == $AsteroidDeath
 			@game_done = true
-			@win = true
 		end
-		#end game if you've missed to many asteroids
-		if @asteroids_missed == 10
-			@game_done = true
-		end
-	end
-	
-	#used to pause or unpause the game
-	def pause_game(paused)
-		@ship.pause(paused)
-		@lasers.each do |laser|
-			laser.pause(paused)
-		end
-		@asteroids.each do |a|
-			a.pause(paused)
-		end
-		@explosions.each do |e|
-			e.pause(paused)
-		end
-		@powerups.each do |p|
-			p.pause(paused)
-		end
-	end
-
-	# restarts the game and resests everything	
-	def restart_game
-		clear_screen
-		pause_game(@pause)
-		@asteroids_missed = 0
-		@asteroids_hit = 0
-		@shots_fired = 0
-		@pause = false
-		@game_done = false
-		@win = false
-		@game_time = Time.now + 120
-	end
-	
-	def clear_screen
-		@asteroids.clear
-		@explosions.clear
-		@lasers.clear
-		@ship.restart
-		@powerups.clear
-		@asteroid_delay = Time.now + 1
-		@powerups_delay = Time.now + 1
 	end
 
 	def draw
@@ -575,7 +609,7 @@ class MyWindow < Gosu::Window
 			end
 			#displayed when loss of life
 			if @display_timer > Time.now
-				@display.lives_left(@ship.num_lives + 1)
+				@display.level(@level)
 			end
 			#if the game is done -> do fancy
 			if @game_done
@@ -592,6 +626,7 @@ class MyWindow < Gosu::Window
 				#how many asteroids you've missed, how many you've hit, and how much time's left
 				@display.scores(@asteroids_hit, @asteroids_missed, @game_time - Time.now.to_i)
 			end
+			#adds a delay so that you can see that you died before it continues
 			if @sleep_clear > 0
 				if @sleep_clear == 1
 					@sleep_clear += 1
