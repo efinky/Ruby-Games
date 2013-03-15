@@ -2,10 +2,26 @@
 require 'rubygems'
 require 'gosu'
 
+#screen dimensions
 $Height = 800
 $Width = 640
-#640, 480,
 
+#
+#	Lives Class
+#
+class Lives
+	def initialize(window, x, y)
+		@x = x
+		@y = y
+		@image = Gosu::Image.new(window, "ship.png", false)
+	end
+	
+	def draw
+		@image.draw(@x, @y, 1)
+	end
+
+end
+# ^Lives
 #
 #	PowerUp Class
 #
@@ -22,7 +38,7 @@ class PowerUp
 	end
 	
 	def exists?
-		@y < $Height
+		@y < $Height - 70
 	end
 	
 	def pause(p)
@@ -37,6 +53,7 @@ class PowerUp
 	end
 
 end
+# ^PowerUp
 #
 #	Asteroid Class
 #
@@ -56,7 +73,7 @@ class Asteroid
 	end
 	
 	def exists?
-		@y < $Height
+		@y < $Height - 70
 	end
 	
 	def pause(p)
@@ -86,6 +103,7 @@ class Asteroid
 		end
 	end
 end
+# ^Asteroid
 #
 #	Laser Class
 #
@@ -122,6 +140,7 @@ class Laser
 	end
 
 end
+# ^Laser
 #
 #	Explosion Class
 #
@@ -150,13 +169,14 @@ class Explosion
 		@image.draw(@x, @y, 2)
 	end
 end
+# ^Explosion
 #
 #	Ship Class
 #
 class Ship
-	attr_reader :x, :y, :w, :h, :exists, :powerup_name
+	attr_reader :x, :y, :w, :h, :exists, :powerup_name, :num_lives
 	def initialize(window)
-		@x = $Width/2 - 20 #centers the ship
+		@x = $Width/2 - 15 #centers the ship
 		@y = $Height - 60
 		@w = 30
 		@h = 31
@@ -168,41 +188,56 @@ class Ship
 		@exists = true
 		@powerup_name = ""
 		@laser_timeout = Time.now
+		@lives = []
+		@lives.push Lives.new(window, 550, 775)
+		@lives.push Lives.new(window, 600, 775)
+		@num_lives = @lives.length
 		
 		
 	end
-	
+	#controls left movement
 	def move_left
 		if @x > 0 and !@pause
 			@x = @x - 10
 		end
 	end
+	#controls right movement
 	def move_right
 		if @x < $Width - 30 and !@pause
 			@x = @x + 10
 		end
 	end
 	
-	def destroy
+	#handles and returns whether or not the ship is destroyed
+	#returns -1 if destroyed, 0 if shield protected and 1 if loss of life
+	def destroy()
+		#if it has a shield remove shield but don't destroy ship or remove a life
 		if @powerup_name == "shield.png"
 			@powerup_name = ""
-			return false
+			return 0
 		elsif @powerup_name == "both"
 			@powerup_name = "laser_powerup.png"
-			return false
-		else
+			return 0
+		#removes a life and checks to see if it was the last one left
+		elsif @lives.pop == nil
 			@exists = false
-			return true
+			return -1
+		#else life was 'pop'ed on the last check so just return 1
+		else
+			return 1
 		end
 	end
 	
+	#handles restarting for the ship
 	def restart
 		@x = $Width/2 - 15 #centers the ship
-		@y = $Height - 40
+		@y = $Height - 60
 		@exists = true
 		@powerup_name = ""
 		@laser_timeout = Time.now
 	end
+	
+	#accepts the powerups and sets their name
 	def powerup(name)
 		if @powerup_name == ""
 			@powerup_name = name
@@ -214,12 +249,13 @@ class Ship
 		end
 	end
 
-	
+	#used to pause or unpause the ship
 	def pause(p)
 		@pause = p
 	end
 	
 	def draw
+		#used to update which powerups the ship currently has
 		if @powerup_name == "laser_powerup.png" or @powerup_name == "both"
 			if @laser_timeout < Time.now
 				if @powerup_name == "both"
@@ -229,6 +265,7 @@ class Ship
 				end
 			end	
 		end
+		#draws the appropriate ship depending on which powerup it currently has
 		if @powerup_name == "shield.png"
 			@image_shield.draw(@x, @y, 1)
 		elsif @powerup_name == "laser_powerup.png"
@@ -238,8 +275,14 @@ class Ship
 		else			
 			@image.draw(@x, @y, 1)
 		end
+		#displays number of lives left
+		@lives.each do |life|
+			life.draw
+		end
+		@num_lives = @lives.length
 	end
 end
+# ^Ship
 #
 #	Display Class
 #
@@ -254,24 +297,40 @@ class Display
 		@line4 = Gosu::Font.new(window, 'courier', 25)
 	end
 	
+	#final results
 	def final_results(asteroids_missed, asteroids_hit, shots_fired)
-		@line1.draw("YOU WIN!!!!!", 150, 300, 3)
+		#calculates accuracy
+		if (shots_fired != 0)
+			accuracy = (asteroids_hit.to_f/shots_fired.to_f) * 100
+		else
+			accuracy = 0
+		end
+		
+		#@line1.draw("YOU WIN!!!!!", 150, 300, 3)
 		@line2.draw("Asteroids Missed: #{asteroids_missed}", 150, 330, 3)
 		@line3.draw("Asteroids Hit: #{asteroids_hit}", 150, 360, 3)
-		@line4.draw("Shots Fired: #{shots_fired}", 150, 390, 3)
+		@line4.draw("Shots Fired: #{shots_fired}  Accuracy: %#{accuracy.to_i}", 150, 390, 3)
 	end
 	
+	#startup message
 	def start_up
 		@line1.draw("Welcome to ____________", 120, 300, 3)
 		@line2.draw("Your goal is live for 2 minutes", 120, 330, 3)
 		@line3.draw("don't let 10 asteroids get passed!", 120, 360, 3)
 		@line4.draw("Good Luck! (press space to start)", 120, 390, 3)
 	end
+	
+	def lives_left(lives)
+		@line1.draw("#{lives} live(s) left.", 200, 400, 3)
+	end
+	
+	#scores displayed during runtime
 	def scores(asteroids_hit, asteroids_missed, time_left)
-		@line1.draw("Hit: #{asteroids_hit}   Missed: #{asteroids_missed}   Time Left#{time_left}", 50, 780, 3)
+		@line1.draw("Hit: #{asteroids_hit}  Missed: #{asteroids_missed}  Time Left: #{time_left.strftime("%M:%S")}", 10, 779, 3)
 	end
 
 end
+# ^Display
 #
 #	Main Window
 #	WHERE STUFF HAPPENS
@@ -286,11 +345,15 @@ class MyWindow < Gosu::Window
 		@asteroids = []
 		@explosions = []
 		@powerups = []
+		@lives = []
+		@lives.push Lives.new(self, 550, 775)
+		@lives.push Lives.new(self, 600, 775)
 		
 		#timeing info
 		@asteroid_delay = Time.now + 1
 		@powerup_delay = Time.now + rand*1 + 1
-		@game_time = Time.now + 120 #level 1 will last two minutes
+		@game_time = Time.now + 120 # + however many seconds you want the game to last
+		@display_timer = Time.now
 		
 		#scoring info
 		@asteroids_missed = 0
@@ -302,9 +365,11 @@ class MyWindow < Gosu::Window
 		@startup = true
 		@game_done = false
 		@win = false
+		@sleep_clear = 0
 		
 		#fancy stuff
 		@gameover = Gosu::Image.new(self, "gameover.png", false)
+		@win_image = Gosu::Image.new(self, "win.png", false)
 		@display = Display.new(self)
 		
 		#start the game paused so we can display the rules
@@ -312,12 +377,13 @@ class MyWindow < Gosu::Window
 		
 	end
 	
+	#space, escape, r, p
 	def button_down(id)
 		case id
 		#escape to close game
 		when Gosu::KbEscape
 			self.close
-		when Gosu::KbSpace
+		when Gosu::KbSpace, Gosu::KbUp
 			#space is used to start the game
 			if @startup
 				@pause = !@pause
@@ -395,9 +461,19 @@ class MyWindow < Gosu::Window
 			if are_touching?(a, @ship)
 				@explosions.push Explosion.new(self, a.x+5, a.y)
 				@asteroids.delete(a)
-				if @ship.destroy
+				check = @ship.destroy
+				#game over, all lives lost, and ship destroyed
+				if check == -1
+					@explosions.push Explosion.new(self, @ship.x+5, @ship.y)
 					@game_done = true
+				#loss of life
+				elsif check == 1
+					@explosions.push Explosion.new(self, @ship.x+5, @ship.y)
+					@sleep_clear = 1
+	##########################################doesn't work####################################################
+					@display_timer = Time.now + 2
 				end
+				#if check == 0 then ship simply lost shield powerup
 			end
 		end
 		#collision detection for powerups
@@ -409,8 +485,8 @@ class MyWindow < Gosu::Window
 		end
 		#game timer
 		if @game_time < Time.now
-			@game_done
-			@win
+			@game_done = true
+			@win = true
 		end
 		#end game if you've missed to many asteroids
 		if @asteroids_missed == 10
@@ -437,29 +513,33 @@ class MyWindow < Gosu::Window
 
 	# restarts the game and resests everything	
 	def restart_game
-		@asteroids.clear
-		@explosions.clear
-		@lasers.clear
-		@ship.restart
-		@asteroid_delay = Time.now + 1
-		@powerups_delay = Time.now + 1
-		@powerups.clear
-		@pause = false
+		clear_screen
 		pause_game(@pause)
 		@asteroids_missed = 0
 		@asteroids_hit = 0
 		@shots_fired = 0
+		@pause = false
 		@game_done = false
 		@win = false
+		@game_time = Time.now + 120
+	end
+	
+	def clear_screen
+		@asteroids.clear
+		@explosions.clear
+		@lasers.clear
+		@ship.restart
+		@powerups.clear
+		@asteroid_delay = Time.now + 1
+		@powerups_delay = Time.now + 1
 	end
 
 	def draw
+		#startup display
 		if @startup
 			@display.start_up
-		#usual game play
+		#continue with usual game play after startup
 		else
-			#how many asteroids you've missed
-			@display.scores(@asteroids_hit, @asteroids_missed, @game_time - Time.now)
 			#is ship distroyed or not
 			if @ship.exists
 				@ship.draw
@@ -493,13 +573,32 @@ class MyWindow < Gosu::Window
 					@explosions.delete(e)
 				end
 			end
-			#do fancy for end of game
+			#displayed when loss of life
+			if @display_timer > Time.now
+				@display.lives_left(@ship.num_lives + 1)
+			end
+			#if the game is done -> do fancy
 			if @game_done
 				pause_game(true)
 				if !@win
-					@gameover.draw(150, 200, 3)
-				else
+					@gameover.draw(150, 100, 3)
 					@display.final_results(@asteroids_missed, @asteroids_hit, @shots_fired)
+				else
+					@win_image.draw(150, 100, 3)
+					@display.final_results(@asteroids_missed, @asteroids_hit, @shots_fired)
+				end
+			#only display this while the game is currently running
+			else
+				#how many asteroids you've missed, how many you've hit, and how much time's left
+				@display.scores(@asteroids_hit, @asteroids_missed, @game_time - Time.now.to_i)
+			end
+			if @sleep_clear > 0
+				if @sleep_clear == 1
+					@sleep_clear += 1
+				elsif @sleep_clear == 2
+					@sleep_clear = 0
+					sleep(0.5)
+					clear_screen
 				end
 			end
 		end
