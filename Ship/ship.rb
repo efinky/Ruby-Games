@@ -7,13 +7,14 @@ include Math
 $Height = 800
 $Width = 640
 #time per each level in seconds
-$TimeLimit = 45
+$TimeLimit = 20
 #number of asteroids you can't let past
 $AsteroidDeath = 5
 #length of laser powerup
 $LaserPowerup = 13
-$StartingLevel = 12
-
+$StartingLevel = 1
+$MaxLevel = 12
+$Cheat = false
 #
 #	Lives Class
 #
@@ -438,9 +439,12 @@ class Ship
 		
 		@missles_collected = []
 		@missles = 0
-		1000.times do
-			@missles_collected.push MisslePowerup.new(@window, 10 + @missles*18, 760)
-			@missles += 1
+		###############################add if you want 1000 missles to start######################
+		if $Cheat
+			1000.times do
+				@missles_collected.push MisslePowerup.new(@window, 10 + @missles*18, 760)
+				@missles += 1
+			end
 		end
 		@shields_collected = []
 		@shields = 0
@@ -593,7 +597,7 @@ class Display
 	end
 	
 	#final results
-	def final_results(asteroids_missed, asteroids_hit, shots_fired)
+	def final_results(asteroids_missed, asteroids_hit, asteroids_hit_missles, missles_fired, shots_fired)
 		#calculates accuracy
 		if (shots_fired != 0)
 			accuracy = (asteroids_hit.to_f/shots_fired.to_f) * 100
@@ -601,18 +605,18 @@ class Display
 			accuracy = 0
 		end
 		
-		#@line1.draw("YOU WIN!!!!!", 150, 300, 3)
-		@line2.draw("Asteroids Missed: #{asteroids_missed}", 150, 330, 3)
-		@line3.draw("Asteroids Hit: #{asteroids_hit}", 150, 360, 3)
-		@line4.draw("Shots Fired: #{shots_fired}  Accuracy: %#{accuracy.to_i}", 150, 390, 3)
+		@line1.draw("Asteroids Missed: #{asteroids_missed}", 80, 300, 3)
+		@line2.draw("Asteroids hit by Lasers:#{asteroids_hit}", 80, 330, 3)
+		@line3.draw("Asteroids hit by Missles:#{asteroids_hit_missles}", 80, 360, 3)
+		@line4.draw("Shots Fired:#{shots_fired}  Missles:#{missles_fired}  Accuracy:%#{accuracy.to_i}", 80, 390, 3)
 	end
 	
 	#startup message
 	def start_up
-		@line1.draw("Welcome to THISGAME", 120, 300, 3)
-		@line2.draw("IF you complete all 5 levels you win!", 120, 330, 3)
-		@line3.draw("don't let #{$AsteroidDeath} asteroids get passed!", 120, 360, 3)
-		@line4.draw("Good Luck! (press space to start)", 120, 390, 3)
+		@line1.draw("Welcome to THISGAME", 80, 300, 3)
+		@line2.draw("IF you complete all #{$MaxLevel} levels you win!", 80, 330, 3)
+		@line3.draw("don't let #{$AsteroidDeath} asteroids get passed!", 80, 360, 3)
+		@line4.draw("Good Luck! (press space to start)", 80, 390, 3)
 	end
 	
 	def level(new_level)
@@ -621,7 +625,7 @@ class Display
 	
 	#scores displayed during runtime
 	def scores(asteroids_hit, asteroids_missed, time_left, levels)
-		@line1.draw("Hit: #{asteroids_hit}  Missed: #{asteroids_missed}  Level #{levels} Time: #{time_left.strftime("%M:%S")}", 10, 10, 3)
+		@line1.draw("Hit: #{asteroids_hit} Missed: #{asteroids_missed} Level #{levels} Time: #{time_left.strftime("%M:%S")}", 10, 10, 3)
 		#### maybe add a counter so that you can have more than 2 lives?
 	end
 
@@ -654,7 +658,9 @@ class MyWindow < Gosu::Window
 		#scoring info
 		@asteroids_missed = 0
 		@asteroids_hit = 0
+		@asteroids_hit_missles = 0
 		@shots_fired = 0
+		@missles_fired = 0
 		
 		#game flow bools
 		@pause = true
@@ -714,7 +720,9 @@ class MyWindow < Gosu::Window
 		pause_game(@pause)
 		@asteroids_missed = 0
 		@asteroids_hit = 0
+		@asteroids_hit_missles = 0
 		@shots_fired = 0
+		@missles_fired = 0
 		@pause = false
 		@game_done = false
 		@win = false
@@ -783,6 +791,7 @@ class MyWindow < Gosu::Window
 			if !@game_done and !@pause
 				if @ship.missle_fired?
 					@missles.push Missle.new(self, @ship.x, @ship.y)
+					@missles_fired += 1
 				end
 			end
 		#"p" to pause
@@ -864,7 +873,7 @@ class MyWindow < Gosu::Window
 					@explosions.push Explosion.new(self, a.x, a.y)
 					missle.destroyed
 					@missles.delete(missle)
-					@asteroids_hit += 1
+					@asteroids_hit_missles += 1
 				end
 			end
 			#collision detection for the ship
@@ -894,8 +903,8 @@ class MyWindow < Gosu::Window
 			end
 		end
 		#game timer
-		if @game_time < Time.now
-			if @level == 12
+		if @game_time < Time.now and !@pause
+			if @level == $MaxLevel
 				@game_done = true
 				@win = true
 			else
@@ -923,19 +932,19 @@ class MyWindow < Gosu::Window
 			if !@game_done
 			#how many asteroids you've missed, how many you've hit, and how much time's left
 				if @pause
-					@display.scores(@asteroids_hit, @asteroids_missed, Time.at(@paused_time), @level)
+					@display.scores(@asteroids_hit + @asteroids_hit_missles, @asteroids_missed, Time.at(@paused_time), @level)
 				else
-					@display.scores(@asteroids_hit, @asteroids_missed, @game_time - Time.now.to_i, @level)
+					@display.scores(@asteroids_hit + @asteroids_hit_missles, @asteroids_missed, @game_time - Time.now.to_i, @level)
 				end
 			#if the game is done -> do fancy
 			else
 				pause_game(true)
 				if !@win
 					@gameover.draw(150, 100, 3)
-					@display.final_results(@asteroids_missed, @asteroids_hit, @shots_fired)
+					@display.final_results(@asteroids_missed, @asteroids_hit, @asteroids_hit_missles, @missles_fired, @shots_fired)
 				else
 					@win_image.draw(150, 100, 3)
-					@display.final_results(@asteroids_missed, @asteroids_hit, @shots_fired)
+					@display.final_results(@asteroids_missed, @asteroids_hit, @asteroids_hit_missles, @missles_fired, @shots_fired)
 				end
 			end
 			#is ship distroyed or not
