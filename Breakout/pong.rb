@@ -160,7 +160,7 @@ class GameWindow < Gosu::Window
 		@num_lives = 3
 		@win = false
 		@first_time = true
-		@level = 4
+		@level = 1
 		#used to display text for short duration
 		@repeat = true
 		start
@@ -334,7 +334,7 @@ class GameWindow < Gosu::Window
 					@repeat = false
 				else
 					@level += 1
-					sleep(1)
+					sleep(2)
 					start
 					@win = false
 					@repeat = true
