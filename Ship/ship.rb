@@ -3,26 +3,36 @@ require 'rubygems'
 require 'gosu'
 include Math
 
+##### buildings, 
+#### pause in asteroid gen between levels ##### DONE
+##### fix pause time so it doesn't gliche ##### DONE
+#change time displayed to overall time played...  #### DONE
+
+#do we want levels to be a specific time? or some sort of goal?
+
 #screen dimensions
 $Height = 800
 $Width = 640
 #time per each level in seconds
-$TimeLimit = 20
-#number of asteroids you can't let past
-$AsteroidDeath = 5
+$TimeLimit = 45
+#number of asteroids you can't let past per level
+$AsteroidDeath = 20
 #length of laser powerup
 $LaserPowerup = 13
-$StartingLevel = 1
+$StartingLevel = 2
 $MaxLevel = 12
-$Cheat = false
-#
+$Cheat = true
+
+#####################################################################
 #	Lives Class
-#
+#####################################################################
 class Lives
-	def initialize(window, x, y)
-		@x = x
-		@y = y
+	def initialize(window, dx)
 		@image = Gosu::Image.new(window, "ship.png", false)
+		@w = @image.width
+		@h = @image.height
+		@x = $Width - dx - 40
+		@y = 10
 	end
 	
 	def draw
@@ -31,48 +41,13 @@ class Lives
 
 end
 # ^Lives
-#
-#	Shields Class
-#
-class Shields
-	def initialize(window, x, y)
-		@x = x
-		@y = y
-		@image = Gosu::Image.new(window, "shields.png", false)
-	end
-	
-	def draw
-		@image.draw(@x, @y, 0)
-	end
 
-end
-# ^Shields
-#
-#	MisslePowerup Class
-#
-class MisslePowerup
-	def initialize(window, x, y)
-		@x = x
-		@y = y
-		@image = Gosu::Image.new(window, "missles_collected.png", false)
-	end
-	
-	def draw
-		@image.draw(@x, @y, 0)
-	end
-
-end
-# ^MisslePowerup
-#
+#####################################################################
 #	PowerUp Class
-#
+#####################################################################
 class PowerUp
 	attr_reader :x, :y, :w, :h, :laser, :is_shield
 	def initialize(window, level)
-		@x = rand*($Width - 40)
-		@y = 40
-		@w = 40
-		@h = 40
 		@is_shield = false
 		@laser = ""
 		@images = ["powerup_shield.png", "powerup_blue.png", "powerup_missle.png", "powerup_green.png"]
@@ -98,10 +73,15 @@ class PowerUp
 			@is_shield = true
 		end
 		@image = Gosu::Image.new(window, @name, false)
+		@w = @image.width
+		@h = @image.height
+		@x = rand*($Width - @w)
+		@y = @h
+		
 	end
 	
 	def exists?
-		@y < $Height - 50
+		@y < $Height - @h - 10
 	end
 	
 	def pause(p)
@@ -117,47 +97,50 @@ class PowerUp
 
 end
 # ^PowerUp
-#
+
+#####################################################################
 #	Asteroid Class
-#
+#####################################################################
 class Asteroid
 	attr_reader :x, :y, :w, :h, :name, :destroyed, :tracked
 	def initialize(window, level)
-		@x = rand*($Width - 40)
-		@y = 40
-		
+			
 		@level = level
 		if @level < 10
 			@vy = 1
 		else
 			@vy = 3
 		end
-		@w = 40
-		@h = 40
 		
-		@images = ['asteroid.png', 'smiles.png', 'pink.png', 'red.png', 'purple.png']
-		if level <= 5
-			@name = @images[rand*(@images.length - (5 - level))]
+		
+		@images = ['asteroid.png', 'smiles.png', 'pink.png', 'red.png', 'purple.png', 'asteroid_tiny.png']
+		if level <= @images.length
+			@name = @images[rand*(@images.length - (@images.length - level))]
 		else
-			@name = @images[rand*5]
+			@name = @images[rand*@images.length]
 		end
 		@image = Gosu::Image.new(window, @name, false)
 		if @level < 8
-			@purple_teleport = Time.now + rand*1 + 0.5
+			@purple_teleport = Time.now + rand*1.0 + 0.5
 		elsif @level < 12 
-			@purple_teleport = Time.now + rand*1 + 0.1
+			@purple_teleport = Time.now + rand*1.0 + 0.1
 		else
-			@purple_teleport = Time.now + rand*1
+			@purple_teleport = Time.now + rand*1.0
 		end
 		@destroyed = false
 		@tracked = false
 		@pause = false
 		
+		@w = @image.width
+		@h = @image.height
+		@y = @h
+		@x = rand*($Width - @w)
+		
 		@line2 = Gosu::Font.new(window, 'courier', 25)
 	end
 	
 	def exists?
-		if @y < $Height - 70
+		if @y < $Height - 50
 			@destroyed = false
 			return true
 		else
@@ -188,7 +171,7 @@ class Asteroid
 			#level 3
 			elsif @name == "pink.png"
 				@y = @y + 4
-				if @x > $Width - 40
+				if @x > $Width - @w
 					@x = @x - 8
 				elsif @x < 0
 					@x = @x + 8
@@ -215,13 +198,13 @@ class Asteroid
 			elsif @name == "purple.png"
 				@y = @y + 4
 				if @purple_teleport < Time.now
-					@x = rand*560 + 40
+					@x = rand*($Width - @w) + @w
 					if @level < 8
-						@purple_teleport = Time.now + rand*1 + 0.5
+						@purple_teleport = Time.now + rand*1.0 + 0.5
 					elsif @level < 12
-						@purple_teleport = Time.now + rand*1 + 0.1
+						@purple_teleport = Time.now + rand*1.0 + 0.1
 					else
-						@purple_teleport = Time.now + rand*1
+						@purple_teleport = Time.now + rand*1.0
 					end
 				end
 			else
@@ -231,20 +214,48 @@ class Asteroid
 	end
 end
 # ^Asteroid
-#
+
+#####################################################################
+#	Building Class
+#####################################################################
+class Building
+	attr_reader :x, :y, :w, :h
+	def initialize(window, current_x, image)
+		@images = ["building_big.png", "building_medium.png", "building_small.png", "building_tiny.png"]
+		@image = Gosu::Image.new(window, @images[image], false)
+		@w = @image.width
+		@h = @image.height
+		@x = current_x - @w - (rand*5 + 5)
+		@y = $Height - @h
+	end
+	
+	def draw
+		@image.draw(@x, @y, 0)
+	end
+
+end
+# ^ Buildings
+
+#####################################################################
 #	Laser Class
-#
+#####################################################################
 class Laser
 	attr_reader :x, :y, :w, :h
 	def initialize(window, x, y, powerup = -1, direction = 0)
-		@x = x + 17
+		@x = x + 13
 		@y = y - 7
-		@w = 4
-		@h = 15
-		@image = Gosu::Image.new(window, 'laser.png', false)
-		@image_powerup = Gosu::Image.new(window, 'blue_laser.png', false)
-		@image_green = Gosu::Image.new(window, 'green_laser.png', false)
-		@powerup = powerup
+		#normal orange lasers
+		if powerup == -1
+			@image = Gosu::Image.new(window, 'laser.png', false)
+		#blue lasers
+		elsif powerup == 0
+			@image = Gosu::Image.new(window, 'blue_laser.png', false)
+		#green lasers
+		else powerup == 1
+			@image = Gosu::Image.new(window, 'green_laser.png', false)
+		end
+		@w = @image.width
+		@h = @image.height
 		@direction = direction
 		@pause = false
 	end
@@ -258,29 +269,19 @@ class Laser
 	end
 		
 	def draw
-		#normal orange lasers
-		if @powerup == -1
-			@image.draw(@x, @y, 1)
-		#blue lasers
-		elsif @powerup == 0
-			@image_powerup.draw(@x, @y, 1)
-		#green lasers
-		elsif @powerup == 1
-			@image_green.draw(@x, @y, 1)
-			if !@pause
-				@x -= @direction
-			end
-		end
+		@image.draw(@x, @y, 1)
 		if !@pause
 			@y = @y - 7
+			@x -= @direction
 		end
 	end
 
 end
 # ^Laser
-#
+
+#####################################################################
 #	Missle Class
-#
+#####################################################################
 class Missle
 	attr_reader :x, :y, :w, :h, :tracking
 	def initialize(window, x, y)
@@ -288,6 +289,7 @@ class Missle
 		@y = y
 		@w = 40
 		@h = 40
+		@speed = 10
 		@pause = false
 		@tracking = false
 		@asteroid = nil
@@ -327,11 +329,11 @@ class Missle
 			#keep the program from crashing if there isn't an asteroid yet
 			if @asteroid != nil
 				#determine velocity first
-				d_x = (@x - (@asteroid.x+20)).abs
-				d_y = (@y - (@asteroid.y+20)).abs
+				d_x = (@x - (@asteroid.x+(@asteroid.w/2))).abs
+				d_y = (@y - (@asteroid.y+(@asteroid.h/2))).abs
 		
-				vy = 10 * (Math.sin(Math.atan(d_y.to_f/d_x.to_f)))
-				vx = 10 * (Math.sin(Math.atan(d_x.to_f/d_y.to_f)))
+				vy = @speed * (Math.sin(Math.atan(d_y.to_f/d_x.to_f)))
+				vx = @speed * (Math.sin(Math.atan(d_x.to_f/d_y.to_f)))
 				angle_right = ((Math.atan(d_x.to_f/d_y.to_f) * 180)/PI)
 				angle_left = ((Math.atan(d_y.to_f/d_x.to_f) * 180)/PI)
 				#if asteroid destroyed continue forward till a new asteroid is assigned
@@ -339,24 +341,24 @@ class Missle
 					@tracking = false
 					#missle is going up
 					y_movement = -1
-					@y -= 10
+					@y -= @speed
 					@angle = 0
 				#if the asteroid is not destroyed track it
 				else
 					@tracking = true
-					if @asteroid.x > @x + 10
+					if @asteroid.x > @x + (@asteroid.w/4)
 						@x += vx
 						@angle = angle_right
 						#missle is going to the right
 						x_movement = 1
-					elsif @asteroid.x < @x - 10
+					elsif @asteroid.x < @x - (@asteroid.w/4)
 						#missle is going to the left
 						@angle = angle_left + 270
 						x_movement = -1
 						@x -= vx
 					end
 					#if we are in paralell with the asteroid
-					if @asteroid.y >= @y + 20 and @asteroid.y <= @y - 20 
+					if @asteroid.y >= @y + (@asteroid.h/2) and @asteroid.y <= @y - (@asteroid.h/2) 
 						
 					#if we are above the asteroid
 					elsif @asteroid.y > @y
@@ -379,7 +381,7 @@ class Missle
 				end
 			else
 				tracking = false
-				@y -= 10
+				@y -= @speed
 				@angle = 0
 				#missle is going up
 				y_movement = -1
@@ -389,9 +391,10 @@ class Missle
 	end
 end
 # ^ Missle
-#
+
+#####################################################################
 #	Explosion Class
-#
+#####################################################################
 class Explosion
 	def initialize(window, x, y)
 		@x = x - 10
@@ -418,14 +421,15 @@ class Explosion
 	end
 end
 # ^Explosion
-#
+
+#####################################################################
 #	Ship Class
-#
+#####################################################################
 class Ship
 	attr_reader :x, :y, :w, :h, :exists, :lasers
 	def initialize(window)
 		@x = $Width/2 - 15 #centers the ship
-		@y = $Height - 60
+		@y = $Height - 100
 		@w = 30
 		@h = 31
 		@window = window
@@ -436,17 +440,11 @@ class Ship
 		@image_shield_blue = Gosu::Image.new(window, 'ship_shield_blue.png', false)
 		@image_blue = Gosu::Image.new(window, 'ship_blue.png', false)
 		@image_green = Gosu::Image.new(window, 'ship_green.png', false)
-		
-		@missles_collected = []
+		@display_num_missles = Gosu::Font.new(window, 'courier', 20)
+		@display_num_shields = Gosu::Font.new(window, 'courier', 20)
+		@image_p_missles = Gosu::Image.new(window, 'missle.png', false)
+		@image_p_shields = Gosu::Image.new(window, 'shields.png', false)
 		@missles = 0
-		###############################add if you want 1000 missles to start######################
-		if $Cheat
-			1000.times do
-				@missles_collected.push MisslePowerup.new(@window, 10 + @missles*18, 760)
-				@missles += 1
-			end
-		end
-		@shields_collected = []
 		@shields = 0
 
 		@pause = false
@@ -455,8 +453,8 @@ class Ship
 		@lasers = ""
 		@laser_timeout = Time.now
 		@lives = []
-		@lives.push Lives.new(window, 550, 10)
-		@lives.push Lives.new(window, 600, 10)	
+		@lives.push Lives.new(window, 50)
+		@lives.push Lives.new(window, 0)	
 		
 	end
 	#controls left movement
@@ -478,7 +476,6 @@ class Ship
 		#if it has a shield remove shield but don't destroy ship or remove a life
 		if @shields > 0
 			@shields -= 1
-			@shields_collected.pop
 			return 0
 		#removes a life and checks to see if it was the last one left
 		elsif @lives.pop == nil
@@ -493,7 +490,6 @@ class Ship
 	def missle_fired?
 		if @missles > 0
 			@missles -= 1
-			@missles_collected.pop
 			return true
 		else
 			return false
@@ -503,25 +499,21 @@ class Ship
 	#handles restarting for the ship
 	def restart
 		@x = $Width/2 - 15 #centers the ship
-		@y = $Height - 60
+		@y = $Height - 100
 		@exists = true
 		@powerup_name = ""
 		@laser_timeout = Time.now
 		@shields = 0
-		@shields_collected.clear
 		@missles = 0
-		@missles_collected.clear
 	end
 	
 	#accepts the powerups and sets their name
 	def powerup(laser, is_shield)
 		
 		if is_shield
-			@shields_collected.push Shields.new(@window, 580 - @shields*27, 773)
 			@shields += 1
 		elsif laser == "m"
 			3.times do
-				@missles_collected.push MisslePowerup.new(@window, 10 + @missles*18, 760)
 				@missles += 1
 			end
 		
@@ -571,20 +563,23 @@ class Ship
 			life.draw
 		end
 		#displays number of shields collected
-		@shields_collected.each do |shield|
-			shield.draw
-		end
 		#displays number of missles
-		@missles_collected.each do |missle|
-			missle.draw
+		if @shields > 0
+			@display_num_shields.draw("X #{@shields}",$Width - 70, $Height - 40, 1)
+			@image_p_shields.draw($Width - 100, $Height - 40, 1)
+		end
+		if @missles > 0
+			@display_num_missles.draw("X #{@missles}", 30, $Height - 50, 1)
+			@image_p_missles.draw(10, $Height - 60, 1)
 		end
 		
 	end
 end
 # ^Ship
-#
+
+#####################################################################
 #	Display Class
-#
+#####################################################################
 class Display
 #$Height = 800
 #$Width = 640
@@ -631,10 +626,11 @@ class Display
 
 end
 # ^Display
-#
+
+#####################################################################
 #	Main Window
 #	WHERE STUFF HAPPENS
-#
+#####################################################################
 class MyWindow < Gosu::Window
 	def initialize
 		super($Width, $Height, false)
@@ -646,14 +642,29 @@ class MyWindow < Gosu::Window
 		@asteroids = []
 		@explosions = []
 		@powerups = []
+		@buildings = []
+		#create 4 big buildings
+		current_x = $Width - 100
+		while current_x > 100
+			@buildings.push Building.new(self, current_x, rand*4)
+			current_x = (@buildings.last.x)
+		end
+		#create 2 medium buildings
+		
+		#create 3 small buildings
+		
+		#create 4 tiny buildings
+		
 		@level = $StartingLevel
 		
 		#timeing info
 		@asteroid_delay = Time.now + 1
 		@powerup_delay = Time.now + rand*1 + 1
-		@game_time = Time.now + $TimeLimit # + however many seconds you want the game to last
-		@display_timer = Time.now
+		@level_time = Time.now + $TimeLimit # + however many seconds you want the game to last
+		@display_new_level_timer = Time.now
 		@paused_time = 0
+		@start_time = Time.now
+		@total_time_played = 0
 		
 		#scoring info
 		@asteroids_missed = 0
@@ -691,11 +702,11 @@ class MyWindow < Gosu::Window
 	#used to pause or unpause the game
 	def pause_game(paused)
 		@ship.pause(paused)
-		############################### fix game time ###########################
 		if paused
-			@paused_time = @game_time - Time.now
+			@paused_time = Time.now
 		else
-			@game_time =  Time.now + @paused_time
+			@level_time = Time.now + (@level_time - @paused_time)
+			@start_time = @start_time + (Time.now() - @paused_time)
 		end
 		@lasers.each do |laser|
 			laser.pause(paused)
@@ -726,18 +737,19 @@ class MyWindow < Gosu::Window
 		@pause = false
 		@game_done = false
 		@win = false
-		@game_time = Time.now + $TimeLimit
+		@level = $StartingLevel
+		@level_time = Time.now + $TimeLimit
 	end
 	def next_level
 		#don't reset the ship when you clear
 		clear_screen(false)
-		pause_game(@pause)
-		@pause = false
+		#pause_game(@pause)
+		#@pause = false
 		@game_done = false
 		@win = false
 		###################################### still track total missed ####################
-		@asteroids_missed = 0
-		@game_time = Time.now + $TimeLimit
+		#@asteroids_missed = 0
+		@level_time = Time.now + $TimeLimit
 	end
 	
 	def clear_screen(totally_clear = true)
@@ -766,7 +778,7 @@ class MyWindow < Gosu::Window
 				@pause = !@pause
 				pause_game(@pause)
 				@startup = false
-				@game_time = Time.now + $TimeLimit # + however many seconds you want the game to last
+				@level_time = Time.now + $TimeLimit 
 			#once the game is started its used to fire
 			elsif !@game_done and !@pause
 				x = @ship.x
@@ -792,6 +804,12 @@ class MyWindow < Gosu::Window
 				if @ship.missle_fired?
 					@missles.push Missle.new(self, @ship.x, @ship.y)
 					@missles_fired += 1
+				end
+			end
+		when Gosu::KbM
+			if $Cheat
+				3.times do
+					@ship.powerup("m", false)
 				end
 			end
 		#"p" to pause
@@ -826,7 +844,6 @@ class MyWindow < Gosu::Window
 								asteroid = a
 							else
 								if asteroid.y - missle.y < a.y - missle.y
-									#a.track(true)
 									asteroid = a
 								end
 							end
@@ -840,7 +857,8 @@ class MyWindow < Gosu::Window
 			end
 		end
 		#asteroid creation
-		if @asteroid_delay < Time.now and !@game_done and !@pause
+		
+		if @asteroid_delay < Time.now and !@game_done and !@pause and @level_time - 7 >= Time.now
 			@asteroids.push Asteroid.new(self, @level)
 			#delay till next asteroid
 			@asteroid_delay = Time.now + rand*2 + 0.1
@@ -894,6 +912,14 @@ class MyWindow < Gosu::Window
 				end
 				#if check == 0 then ship simply lost shield powerup
 			end
+			#collision detection for buildings
+			@buildings.each do |b|
+				if are_touching?(a, b)
+					@buildings.delete(b)
+					#@asteroids.delete(a)
+					@explosions.push Explosion.new(self, a.x+5, a.y)
+				end
+			end
 		end
 		#collision detection for powerups
 		@powerups.each do |p|
@@ -903,22 +929,28 @@ class MyWindow < Gosu::Window
 			end
 		end
 		#game timer
-		if @game_time < Time.now and !@pause
+		if @level_time < Time.now and !@pause and !@game_done
 			if @level == $MaxLevel
 				@game_done = true
 				@win = true
 			else
 				@level += 1
 				#restarts the timer for the next level
-				@game_time = Time.now + $TimeLimit
+				@level_time = Time.now + $TimeLimit
 				next_level
-				@display_timer = Time.now + 1
+				@display_new_level_timer = Time.now + 1
 			end
 				
 		end
 		#end game if you've missed too many asteroids
 		if @asteroids_missed == $AsteroidDeath
 			@game_done = true
+		end
+		if @buildings.empty?
+			@game_done = true
+		end
+		if !@pause
+			@total_time_played = Time.now - @start_time
 		end
 	end
 
@@ -931,11 +963,7 @@ class MyWindow < Gosu::Window
 			#only display this while the game is currently running
 			if !@game_done
 			#how many asteroids you've missed, how many you've hit, and how much time's left
-				if @pause
-					@display.scores(@asteroids_hit + @asteroids_hit_missles, @asteroids_missed, Time.at(@paused_time), @level)
-				else
-					@display.scores(@asteroids_hit + @asteroids_hit_missles, @asteroids_missed, @game_time - Time.now.to_i, @level)
-				end
+			@display.scores(@asteroids_hit + @asteroids_hit_missles, @asteroids_missed, Time.at(@total_time_played), @level)
 			#if the game is done -> do fancy
 			else
 				pause_game(true)
@@ -958,11 +986,11 @@ class MyWindow < Gosu::Window
 					@lasers.delete(laser)
 				end
 			end
-			
 			@missles.each do |missle|
-				missle.draw
 				if !missle.exists?
 					@missles.delete(missle)
+				else
+					missle.draw
 				end
 			end
 			#track and draw asteroids
@@ -981,6 +1009,11 @@ class MyWindow < Gosu::Window
 					@powerups.delete(p)
 				end
 			end
+			#draw buildings
+			@buildings.each do |b|
+				b.draw
+			end
+			
 			#draw explosions
 			@explosions.each do |e|
 				e.draw
@@ -988,8 +1021,8 @@ class MyWindow < Gosu::Window
 					@explosions.delete(e)
 				end
 			end
-			#displayed when loss of life
-			if @display_timer > Time.now
+			#displayed when change of levels
+			if @display_new_level_timer > Time.now
 				@display.level(@level)
 			end
 			#adds a delay so that you can see that you died before it continues
